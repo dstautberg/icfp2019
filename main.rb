@@ -114,13 +114,80 @@ def process(filename)
             end
         end
     end
-    puts "Starting unwrapped points: #{state.unwrapped_points.inspect}" 
+    puts "Starting unwrapped points: #{state.unwrapped_points.inspect}"
+    
+    @actions = [
+        :up, :down, :left, :right,
+        #:nothing, :turn_cw, :turn_ccw,
+        #:attach_arm, :attach_wheel, :use_drill
+    ]
+    @actions.each do |action|
+        recurse(state, action)
+    end
 end
 
 MapState = Struct.new(:worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves)
 
-def recurse(map_state)
+def recurse(state, action)
+    puts "*** recurse: action=#{action}"
+    puts "worker_location=#{state.worker_location.inspect}"
+    puts "worker_direction=#{state.worker_direction.inspect}"
+    puts "unwrapped_points.size=#{state.unwrapped_points.size}"
+    puts "moves=#{state.moves.inspect}"
+    case action
+        when :up
+            # p = state.worker_location
+            # return if (p.y + 1) > @range.right_top.y
+            # state.worker_location.y = p.y + 1
+            # state.unwrapped_points.delete(state.worker_location)
+            # state.manipulator_points.each do |mp|
+            #     # TODO: check if worker reach is blocked by obstacle
+            #     mp.y = mp.y + 1
+            #     state.unwrapped_points.delete(mp)
+            # end            
+            move(state, 0, 1, 'W')
+        when :down
+            move(state, 0, -1, 'S')
+        when :left
+            move(state, -1, 0, 'A')
+        when :right
+            move(state, 1, 0, 'D')        
+        else
+            raise "Unkown action: #{action}"
+    end
+    if state.unwrapped_points.empty?
+        if @success && @success.size > state.moves
+            @success = state.moves 
+            puts "Found new success state at #{state.moves.size} moves: #{state.moves}"
+        else
+            puts "Found success state at #{state.moves.size} moves, but it was not shorter"
+        end
+    elsif state.moves.size > (@range.right_top.x * @range.right_top.y) # may have to tweak this
+        puts "Giving up after #{state.moves.size} moves"
+        return
+    else
+        @actions.each do |an|
+            recurse(state, an)
+        end
+    end
+end
+
+def move(state, x, y, move_code)
+    p1 = state.worker_location
+    p2 = Point.new(p1.x + x, p1.y + y)
+    return unless @range.contains?(p2)
+    return if @obstacles.any? {|ob| ob.contains?(p2) }
     
+    state.worker_location.x = p2.x
+    state.worker_location.y = p2.y
+    state.unwrapped_points.delete(state.worker_location)
+    state.manipulator_points.each do |mp|
+        mp.x = mp.x + x
+        mp.y = mp.y + y
+        # TODO: check if worker reach is blocked by obstacle
+        state.unwrapped_points.delete(mp)
+    end            
+    state.moves << move_code
 end
 
 Dir.glob('*.desc') do |filename|
