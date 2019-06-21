@@ -55,8 +55,8 @@ def process(filename)
     
     @range = parse_box(@range)
     worker_location = parse_point(worker_location)
-    @obstacles = @obstacles.split(';').map {|obstacle| parse_box(obstacle) }
-    boosters = boosters.split(';').map {|p| parse_booster_point(p) }
+    @obstacles = @obstacles.nil? ? [] : @obstacles.split(';').map {|obstacle| parse_box(obstacle) }
+    boosters = boosters.nil? ? [] : boosters.split(';').map {|p| parse_booster_point(p) }
     puts "@range=#{@range.inspect}"
     puts "worker_location=#{worker_location.inspect}"
     puts "@obstacles=#{@obstacles.inspect}"
@@ -124,27 +124,24 @@ def process(filename)
     @actions.each do |action|
         recurse(state, action)
     end
+    
+    puts "*** Result ***"
+    puts @success.inspect
 end
 
 MapState = Struct.new(:worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves)
 
 def recurse(state, action)
-    puts "*** recurse: action=#{action}"
+    puts "***************** recurse"
     puts "worker_location=#{state.worker_location.inspect}"
     puts "worker_direction=#{state.worker_direction.inspect}"
     puts "unwrapped_points.size=#{state.unwrapped_points.size}"
     puts "moves=#{state.moves.inspect}"
-    case action
+    puts "moves.size=#{state.moves.size}"
+    draw_map(state)
+    puts "action=#{action}"
+    result = case action
         when :up
-            # p = state.worker_location
-            # return if (p.y + 1) > @range.right_top.y
-            # state.worker_location.y = p.y + 1
-            # state.unwrapped_points.delete(state.worker_location)
-            # state.manipulator_points.each do |mp|
-            #     # TODO: check if worker reach is blocked by obstacle
-            #     mp.y = mp.y + 1
-            #     state.unwrapped_points.delete(mp)
-            # end            
             move(state, 0, 1, 'W')
         when :down
             move(state, 0, -1, 'S')
@@ -155,28 +152,48 @@ def recurse(state, action)
         else
             raise "Unkown action: #{action}"
     end
+    draw_map(state)
     if state.unwrapped_points.empty?
-        if @success && @success.size > state.moves
+        if @success.nil? || (@success.size > state.moves.size)
             @success = state.moves 
             puts "Found new success state at #{state.moves.size} moves: #{state.moves}"
         else
             puts "Found success state at #{state.moves.size} moves, but it was not shorter"
         end
-    elsif state.moves.size > (@range.right_top.x * @range.right_top.y) # may have to tweak this
+    elsif too_many_moves(state)
         puts "Giving up after #{state.moves.size} moves"
+        return
+    elsif result == :blocked
+        puts "Move #{action} is blocked"
         return
     else
         @actions.each do |an|
-            recurse(state, an)
+            new_state = MapState.new(
+                state.worker_location,
+                state.worker_direction,
+                state.manipulator_points&.dup,
+                state.unwrapped_points&.dup,
+                state.boosters_held&.dup,
+                state.boosters_active&.dup,
+                state.moves&.dup
+            )
+            recurse(new_state, an)
         end
     end
+end
+
+def too_many_moves(state)
+   return true if @success && @success.size < state.moves.size 
+   return true if state.moves.size > ((@range.right_top.x+1) * (@range.right_top.y+1))
+   false
 end
 
 def move(state, x, y, move_code)
     p1 = state.worker_location
     p2 = Point.new(p1.x + x, p1.y + y)
-    return unless @range.contains?(p2)
-    return if @obstacles.any? {|ob| ob.contains?(p2) }
+    if !@range.contains?(p2) || @obstacles.any? {|ob| ob.contains?(p2) }
+        return :blocked
+    end
     
     state.worker_location.x = p2.x
     state.worker_location.y = p2.y
@@ -188,6 +205,24 @@ def move(state, x, y, move_code)
         state.unwrapped_points.delete(mp)
     end            
     state.moves << move_code
+end
+
+def draw_map(state)
+    @range.right_top.y.downto(0).each do |y|
+        0.upto(@range.right_top.x) do |x|
+            p = Point.new(x, y)
+            if state.worker_location == p
+                print '+'
+            elsif state.manipulator_points.include?(p)
+                print '-'
+            elsif state.unwrapped_points.include?(p)
+                print 'O'
+            else
+                print 'X'
+            end
+        end
+        print "\n"
+    end
 end
 
 Dir.glob('*.desc') do |filename|
