@@ -17,6 +17,10 @@ class Box
     def verify_point(p)
         raise "Not a point: #{p.inspect}" unless p.is_a?(Point)
     end
+    
+    def contains?(point)
+        point.x >= left_bottom.x && point.y >= left_bottom.y && point.x <= right_top.x && point.y <= right_top.y
+    end
 end
 
 class Booster
@@ -47,23 +51,92 @@ def process(filename)
     puts "Processing #{filename}"
     s = open(filename) {|f| f.read }
     puts s
-    range, worker_location, obstacles, boosters = s.split('#')
+    @range, worker_location, @obstacles, boosters = s.split('#')
     
-    range = parse_box(range)
+    @range = parse_box(@range)
     worker_location = parse_point(worker_location)
-    obstacles = obstacles.split(';').map {|obstacle| parse_box(obstacle) }
+    @obstacles = @obstacles.split(';').map {|obstacle| parse_box(obstacle) }
     boosters = boosters.split(';').map {|p| parse_booster_point(p) }
-    puts "range=#{range.inspect}"
+    puts "@range=#{@range.inspect}"
     puts "worker_location=#{worker_location.inspect}"
-    puts "obstacles=#{obstacles.inspect}"
+    puts "@obstacles=#{@obstacles.inspect}"
     puts "boosters=#{boosters.inspect}"
     
     solution_filename = File.basename(filename, '.desc') + '.sol'
     puts "solution filename: #{solution_filename}"
     
-    # TODO
+    # I think some recursion is in order.
+    # That means I am going to need to represent the state of the map.
+    # Figure out how many filled and/or unfilled squares there are.
+    # Go through possible moves: up, down, left, right, do nothing, turn clockwise, turn counterclockwise, 
+    # attach a new manipulator (takes relative x, y coordinates, so that will complicate things), 
+    # attach fast wheels, start using a drill.
+    # It would be helpful to be able to detect redundant states, or maybe keep a heuristic on the progress I'm making,
+    # and bail on the branch of activity if I haven't made progress in a while.
+    # Probably moving forward should always be what I try first, as long as I'm not blocked.
+    # For my first phase, I think I will ignore the boosters, but I need to keep things flexible.
+    # So the manipulator points can change, the movement speed can change, and I may be able to drill through obstacles,
+    # but not move outside the map.
+    
+    # figure out unwrapped points, initial position and manipulator points are wrapped
+    # try moving forward
+        # return if blocked
+        # update unwrapped points
+        # pick up booster if I'm one on
+        # check how long it's been since I made progress
+        # call recursive method
+    # try turning cw    
+        # update unwrapped points
+        # check how long it's been since I made progress
+    # try turning ccw
+
+    state = MapState.new
+    state.worker_location = worker_location
+    state.moves = []
+    # The initial configuration of the manipulators is always the same and is described by the squares
+    # with coordinates [(x + 1,y), (x + 1,y + 1), (x + 1,y − 1)], where (x,y) is the location of the worker
+    state.manipulator_points = [
+        Point.new(worker_location.x+1, worker_location.y),
+        Point.new(worker_location.x+1, worker_location.y+1),
+        Point.new(worker_location.x+1, worker_location.y-1)
+    ]
+    state.worker_direction = Point.new(1, 0) # positive x direction
+    state.unwrapped_points = []
+    0.upto(@range.right_top.x) do |x|
+        0.upto(@range.right_top.y) do |y|
+            point = Point.new(x, y)
+            if ([state.worker_location] + state.manipulator_points).include?(point)
+                puts "Covered by worker: #{point.inspect}"
+            elsif @obstacles.any? {|o| o.contains?(point) }
+                puts "Covered by obstacle: #{point.inspect}"
+            else    
+                state.unwrapped_points << point
+            end
+        end
+    end
+    puts "Starting unwrapped points: #{state.unwrapped_points.inspect}" 
+end
+
+MapState = Struct.new(:worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves)
+
+def recurse(map_state)
+    
 end
 
 Dir.glob('*.desc') do |filename|
     process(filename)
 end
+
+def test
+    box = Box.new([Point.new(1, 2), Point.new(5, 2), Point.new(5, 6), Point.new(5, 2)])
+    puts "box contains 1, 1: #{box.contains?(Point.new(1, 1))}"
+    puts "box contains 1, 2: #{box.contains?(Point.new(1, 2))}"
+    puts "box contains 1, 6: #{box.contains?(Point.new(1, 6))}"
+    puts "box contains 1, 7: #{box.contains?(Point.new(1, 7))}"
+    puts "box contains 0, 3: #{box.contains?(Point.new(0, 3))}"
+    puts "box contains 1, 3: #{box.contains?(Point.new(1, 3))}"
+    puts "box contains 5, 3: #{box.contains?(Point.new(5, 3))}"
+    puts "box contains 6, 3: #{box.contains?(Point.new(6, 3))}"
+end
+
+#test
