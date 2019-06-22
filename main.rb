@@ -1,6 +1,7 @@
 require 'pry'
 
 Point = Struct.new(:x, :y)
+MapState = Struct.new(:worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves, :maps)
 
 class Box
     attr_reader :left_bottom, :right_bottom, :right_top, :left_top
@@ -115,6 +116,7 @@ def process(filename)
         end
     end
     puts "Starting unwrapped points: #{state.unwrapped_points.inspect}"
+    state.maps = [draw_map(state)]
     
     @actions = [
         :up, :down, :left, :right,
@@ -129,12 +131,11 @@ def process(filename)
     puts @success.inspect
 end
 
-MapState = Struct.new(:worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves)
-
 def recurse(state, action)
     puts "***************** recurse"
     puts "worker_location=#{state.worker_location.inspect}"
     puts "worker_direction=#{state.worker_direction.inspect}"
+    puts "manipulator_points=#{state.manipulator_points.inspect}"
     puts "unwrapped_points.size=#{state.unwrapped_points.size}"
     puts "moves=#{state.moves.inspect}"
     puts "moves.size=#{state.moves.size}"
@@ -152,7 +153,17 @@ def recurse(state, action)
         else
             raise "Unkown action: #{action}"
     end
-    draw_map(state)
+    puts "After move #{action}:"
+    puts "worker_location=#{state.worker_location.inspect}"
+    puts "worker_direction=#{state.worker_direction.inspect}"
+    puts "manipulator_points=#{state.manipulator_points.inspect}"
+    puts "unwrapped_points.size=#{state.unwrapped_points.size}"
+    puts "moves=#{state.moves.inspect}"
+    puts "moves.size=#{state.moves.size}"
+    state.maps << draw_map(state)
+    state.maps.each {|m| puts "-----\n#{m}" }
+    puts "-----"
+    
     if state.unwrapped_points.empty?
         if @success.nil? || (@success.size > state.moves.size)
             @success = state.moves 
@@ -169,17 +180,22 @@ def recurse(state, action)
     else
         @actions.each do |an|
             new_state = MapState.new(
-                state.worker_location,
-                state.worker_direction,
-                state.manipulator_points&.dup,
+                state.worker_location.dup,
+                state.worker_direction.dup,
+                clone(state.manipulator_points),
                 state.unwrapped_points&.dup,
                 state.boosters_held&.dup,
                 state.boosters_active&.dup,
-                state.moves&.dup
+                state.moves&.dup,
+                state.maps&.dup
             )
             recurse(new_state, an)
         end
     end
+end
+
+def clone(a)
+    Marshal.load(Marshal.dump(a))
 end
 
 def too_many_moves(state)
@@ -208,21 +224,23 @@ def move(state, x, y, move_code)
 end
 
 def draw_map(state)
+    map = ''
     @range.right_top.y.downto(0).each do |y|
         0.upto(@range.right_top.x) do |x|
             p = Point.new(x, y)
             if state.worker_location == p
-                print '+'
+                map += '+'
             elsif state.manipulator_points.include?(p)
-                print '-'
+                map += '-'
             elsif state.unwrapped_points.include?(p)
-                print 'O'
+                map += 'O'
             else
-                print 'X'
+                map += 'X'
             end
         end
-        print "\n"
+        map += "\n"
     end
+    map
 end
 
 Dir.glob('*.desc') do |filename|
