@@ -132,15 +132,15 @@ def process(filename)
 end
 
 def recurse(state, action)
-    puts "***************** recurse"
-    puts "worker_location=#{state.worker_location.inspect}"
-    puts "worker_direction=#{state.worker_direction.inspect}"
-    puts "manipulator_points=#{state.manipulator_points.inspect}"
-    puts "unwrapped_points.size=#{state.unwrapped_points.size}"
-    puts "moves=#{state.moves.inspect}"
-    puts "moves.size=#{state.moves.size}"
-    draw_map(state)
-    puts "action=#{action}"
+    #puts "***************** recurse"
+    #puts "worker_location=#{state.worker_location.inspect}"
+    #puts "worker_direction=#{state.worker_direction.inspect}"
+    #puts "manipulator_points=#{state.manipulator_points.inspect}"
+    #puts "unwrapped_points.size=#{state.unwrapped_points.size}"
+    #puts "moves=#{state.moves.inspect}"
+    #puts "moves.size=#{state.moves.size}"
+    #draw_map(state)
+    #puts "action=#{action}"
     result = case action
         when :up
             move(state, 0, 1, 'W')
@@ -153,16 +153,16 @@ def recurse(state, action)
         else
             raise "Unkown action: #{action}"
     end
-    puts "After move #{action}:"
-    puts "worker_location=#{state.worker_location.inspect}"
-    puts "worker_direction=#{state.worker_direction.inspect}"
-    puts "manipulator_points=#{state.manipulator_points.inspect}"
-    puts "unwrapped_points.size=#{state.unwrapped_points.size}"
-    puts "moves=#{state.moves.inspect}"
-    puts "moves.size=#{state.moves.size}"
-    state.maps << draw_map(state)
-    state.maps.each {|m| puts "-----\n#{m}" }
-    puts "-----"
+    #puts "After move #{action}:"
+    #puts "worker_location=#{state.worker_location.inspect}"
+    #puts "worker_direction=#{state.worker_direction.inspect}"
+    #puts "manipulator_points=#{state.manipulator_points.inspect}"
+    #puts "unwrapped_points.size=#{state.unwrapped_points.size}"
+    #puts "moves=#{state.moves.inspect}"
+    #puts "moves.size=#{state.moves.size}"
+    #state.maps << draw_map(state)
+    #state.maps.each {|m| puts "-----\n#{m}" }
+    #puts "-----"
     
     if state.unwrapped_points.empty?
         if @success.nil? || (@success.size > state.moves.size)
@@ -172,10 +172,10 @@ def recurse(state, action)
             puts "Found success state at #{state.moves.size} moves, but it was not shorter"
         end
     elsif too_many_moves(state)
-        puts "Giving up after #{state.moves.size} moves"
+        #puts "Giving up after #{state.moves.size} moves"
         return
     elsif result == :blocked
-        puts "Move #{action} is blocked"
+        #puts "Move #{action} is blocked"
         return
     else
         @actions.each do |an|
