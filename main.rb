@@ -14,6 +14,14 @@ class Box
         verify_point(points[2])
         verify_point(points[3])
         @left_bottom, @right_bottom, @right_top, @left_top = points[0], points[1], points[2], points[3]
+        
+        # After review the spec, I realized I was misinterpreting the inputs for boxes:
+        # "An example of a 10 × 10 map with two obstacles is shown in Figure 1. The boundary of the
+        # map is defined by the list of vertices [(0, 0), (10, 0), (10, 10), (0, 10)]."
+        @right_bottom.x -= 1
+        @right_top.x -= 1
+        @right_top.y -= 1
+        @left_top.y -= 1
     end
     
     def verify_point(p)
