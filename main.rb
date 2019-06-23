@@ -1,4 +1,3 @@
-require 'pry'
 
 Point = Struct.new(:x, :y)
 MapState = Struct.new(:range, :worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves, :maps)
@@ -95,7 +94,7 @@ def process(filename)
 	state.range = @range
     state.worker_location = worker_location
     state.worker_direction = Point.new(1, 0) # positive x direction
-	state.manipulator_points = manipulator_points_based_on_direction(state.worker_direction)
+	state.manipulator_points = manipulator_points_based_on_direction(state.worker_location, state.worker_direction)
     state.unwrapped_points = []
     0.upto(@range.right_top.x) do |x|
         0.upto(@range.right_top.y) do |y|
@@ -112,91 +111,101 @@ def process(filename)
     puts "Starting unwrapped points: #{state.unwrapped_points.inspect}"
     state.moves = []
     state.maps = [draw_map(state)]
+	dump_state(state)
 
 	# Ok, revised plan (no recursion this time):
 	# After setting up the initial state and list of unwrapped points.
 	# Check if any of the unwrapped points can be wrapped by turning
 		# Check one turn first, then two turns.
 		# If I find something to wrap, then execute the turn and check again.
-	# Once the turns have been covered, check if a move will hit an unwrapped point.
-		# If so, execute that move and start again from the top.
 	# If none of the above would work, then use the PathFinder to map a route to the nearest unmapped point.
 		# Execute each move in turn, but after each move, re-execute the turn test to see if we can hit any nearby squares.
 	
-	until state.unwrapped_points.empty? do
+#	until state.unwrapped_points.empty? do
 		do_nearby_check(state)
 		path = PathFinder.new(state).find_path
-		path.each do |step|
-			move_to(step)
-			do_nearby_check(state)
-		end
-    end
+		puts "path: #{path.inspect}"
+#		path.each do |step|
+#			move_to(state, step)
+#			do_nearby_check(state)
+#		end
+ #   end
+	puts "----------"
+	state.maps.each {|map| puts map + "\n----------" }
 	
     puts "*** Result ***"
-    puts @success.inspect
+    puts @state.moves.inspect
 end
 
 def do_nearby_check(state)
-	until state.unwrapped_points.empty? do
-		next if turn_cw_if_it_would_wrap(state)
-		next if turn_ccw_if_it_would_wrap(state)
-	end	
+	# TODO: This logic is not quite right.
+	did_turn = true
+	while did_turn do
+		did_turn = turn_cw_if_it_would_wrap(state)
+	end
+	did_turn = true
+	while did_turn do
+		did_turn = turn_ccw_if_it_would_wrap(state)
+	end
 end
 
-def manipulator_points_based_on_direction(direction)
+def manipulator_points_based_on_direction(location, direction)
 	# TODO: This will eventually need to check for additional manipulator arms
 	if direction.x == 1 && direction.y == 0
 		return [
-			Point.new(worker_location.x + 1, worker_location.y - 1),
-			Point.new(worker_location.x + 1, worker_location.y),
-			Point.new(worker_location.x + 1, worker_location.y + 1)
+			Point.new(location.x + 1, location.y - 1),
+			Point.new(location.x + 1, location.y),
+			Point.new(location.x + 1, location.y + 1)
 		]
 	elsif direction.x == 0 && direction.y == -1
 		return [
-			Point.new(worker_location.x - 1, worker_location.y - 1),
-			Point.new(worker_location.x, worker_location.y - 1),
-			Point.new(worker_location.x + 1, worker_location.y - 1)
+			Point.new(location.x - 1, location.y - 1),
+			Point.new(location.x, location.y - 1),
+			Point.new(location.x + 1, location.y - 1)
 		]
 	elsif direction.x == -1 && direction.y == 0
 		return [
-			Point.new(worker_location.x - 1, worker_location.y - 1),
-			Point.new(worker_location.x - 1, worker_location.y),
-			Point.new(worker_location.x - 1, worker_location.y + 1)
+			Point.new(location.x - 1, location.y - 1),
+			Point.new(location.x - 1, location.y),
+			Point.new(location.x - 1, location.y + 1)
 		]
 	elsif direction.x == 0 && direction.y == 1
 		return [
-			Point.new(worker_location.x - 1, worker_location.y + 1),
-			Point.new(worker_location.x, worker_location.y + 1),
-			Point.new(worker_location.x + 1, worker_location.y + 1)
+			Point.new(location.x - 1, location.y + 1),
+			Point.new(location.x, location.y + 1),
+			Point.new(location.x + 1, location.y + 1)
 		]
 	else
-		raise "Bad worker_direction: #{state.worker_direction.inspect}"
+		raise "Bad worker_direction: #{direction.inspect}"
 	end
 end
 
 def turn_cw_if_it_would_wrap(state)
 	# 1,0 -> 0,-1 -> -1,0 -> 0,1 -> 1,0
 	direction = state.worker_direction
+	location = state.worker_location
 	if direction.x == 1 && direction.y == 0
 		new_dir = Point.new(0, -1)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	elsif direction.x == 0 && direction.y == -1
 		new_dir = Point.new(-1, 0)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	elsif direction.x == -1 && direction.y == 0
 		new_dir = Point.new(0, 1)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	elsif direction.x == 0 && direction.y == 1
 		new_dir = Point.new(1, 0)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	else
-		raise "Bad worker_direction: #{state.worker_direction.inspect}"
+		raise "Bad worker_direction: #{direction.inspect}"
 	end
-	# TODO: factor in visibility
-	# do any of the points match unwrapped points
+
+	# Update the state if any of the new points are unwrapped. TODO: factor in visibility
 	if new_points.any? {|p| state.unwrapped_points.include?(p) }
 		state.worker_direction = new_dir
 		state.unwrapped_points = new_points
+		state.maps << draw_map(state)
+		dump_state(state)
 		return true
 	else
 		return false
@@ -206,34 +215,41 @@ end
 def turn_ccw_if_it_would_wrap(state)
 	# 1,0 -> 0,1 -> -1,0 -> 0,-1 -> 1,0
 	direction = state.worker_direction
+	location = state.worker_location
 	if direction.x == 1 && direction.y == 0
 		new_dir = Point.new(0, 1)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	elsif direction.x == 0 && direction.y == 1
 		new_dir = Point.new(-1, 0)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	elsif direction.x == -1 && direction.y == 0
 		new_dir = Point.new(0, -1)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	elsif direction.x == 0 && direction.y == -1
 		new_dir = Point.new(1, 0)
-		new_points = manipulator_points_based_on_direction(new_dir)
+		new_points = manipulator_points_based_on_direction(location, new_dir)
 	else
-		raise "Bad worker_direction: #{state.worker_direction.inspect}"
+		raise "Bad worker_direction: #{direction.inspect}"
 	end
-	# TODO: factor in visibility
-	# do any of the points match unwrapped points
+
+	# Update the state if any of the new points are unwrapped. TODO: factor in visibility
 	if new_points.any? {|p| state.unwrapped_points.include?(p) }
 		state.worker_direction = new_dir
 		state.unwrapped_points = new_points
+		state.maps << draw_map(state)
+		dump_state(state)
 		return true
 	else
 		return false
 	end
 end
 
-def move_to(step)
-
+def move_to(state, step)
+	loc = state.worker_location
+	move(state, 1, 0, 'W') if step.x == loc.x + 1
+	move(state, -1, 0, 'S') if step.x == loc.x - 1
+	move(state, 0, 1, 'D') if step.y == loc.y + 1
+	move(state, 0, -1, 'A') if step.y == loc.y - 1
 end
 
 def clone(a)
@@ -263,6 +279,17 @@ def move(state, x, y, move_code)
         state.unwrapped_points.delete(mp)
     end            
     state.moves << move_code
+	state.maps << draw_map(state)
+	dump_state(state)
+end
+
+def dump_state(state)
+	puts "worker_location: #{state.worker_location.inspect}"
+	puts "worker_direction: #{state.worker_direction.inspect}"
+	puts "manipulator_points: #{state.manipulator_points.inspect}"
+	puts "moves: #{state.moves.inspect}"
+	puts "moves size: #{state.moves.size}"
+	puts "last map:\n#{state.maps.last}"
 end
 
 def draw_map(state)
@@ -274,8 +301,10 @@ def draw_map(state)
                 map += '+'
             elsif state.manipulator_points.include?(p)
                 map += '-'
+			elsif @obstacles.any? {|o| o.contains?(p) }
+				map += '#'
             elsif state.unwrapped_points.include?(p)
-                map += 'O'
+                map += '.'
             else
                 map += 'X'
             end
