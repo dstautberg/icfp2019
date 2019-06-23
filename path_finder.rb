@@ -17,7 +17,8 @@ class PathFinder
     while !queue.empty?
       spot, path_so_far, cost_so_far = queue.pop
       next if been_there[spot]
-      newpath = path_so_far << spot
+      newpath = path_so_far.dup << spot
+      #binding.pry if @state.unwrapped_points.size == 11
       if spot == @goal
         @path = newpath
         return @path
@@ -26,7 +27,9 @@ class PathFinder
       spots_from(spot).each {|newspot|
         next if been_there[newspot]
         newcost = cost_so_far + 1
-        queue.push(newcost + distance(newspot, @goal), [newspot, newpath, newcost])
+        priority = newcost + distance(newspot, @goal)
+	      #binding.pry if @state.unwrapped_points.size == 11
+        queue.push(priority, [newspot, newpath, newcost])
       }
     end
     return nil
@@ -46,7 +49,8 @@ class PathFinder
 	end
 	
 	def distance(p1, p2)
-		(p2.x - p1.x).abs + (p2.y - p1.y).abs
+		#(p2.x - p1.x).abs + (p2.y - p1.y).abs
+		Math.sqrt((p2.x.to_f - p1.x.to_f)**2 + (p2.y.to_f - p1.y.to_f)**2)
 	end
 	
 	def spots_from(spot)

@@ -132,13 +132,18 @@ def process(filename)
         path.each do |step|
         	move_to(state, step)
         	do_nearby_check(state)
+        	break if state.unwrapped_points.empty?
         end
     end
 	puts "----------"
 	state.maps.each {|map| puts map + "\n----------" }
 	
     puts "*** Result ***"
-    puts @state.moves.inspect
+    puts state.moves.inspect
+    open(solution_filename, 'w') do |f|
+        state.moves.each {|move| f.write(move) }
+        f.write("\n")
+    end
 end
 
 def do_nearby_check(state)
@@ -309,6 +314,7 @@ def dump_state(state)
 	puts "worker_location: #{state.worker_location.inspect}"
 	puts "worker_direction: #{state.worker_direction.inspect}"
 	puts "manipulator_points: #{state.manipulator_points.inspect}"
+	puts "unwrapped_points.size: #{state.unwrapped_points.size}"
 	puts "moves: #{state.moves.inspect}"
 	puts "moves size: #{state.moves.size}"
 	puts "last map:\n#{state.maps.last}"
@@ -321,10 +327,10 @@ def draw_map(state)
             p = Point.new(x, y)
             if state.worker_location == p
                 map += '*'
-            elsif state.manipulator_points.include?(p)
-                map += '+'
 			elsif @obstacles.any? {|o| o.contains?(p) }
 				map += '#'
+            elsif state.manipulator_points.include?(p)
+                map += '+'
             elsif state.unwrapped_points.include?(p)
                 map += '.'
             else
