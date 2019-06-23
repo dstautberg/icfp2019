@@ -3,49 +3,50 @@ require_relative './priority_queue'
 class PathFinder
 	attr_accessor :path
 
-	def initialize(state)
+	def initialize(state, obstacles)
 		@state = state
 		@start = @state.worker_location
+		@obstacles = obstacles
 		@goal = closest_unwrapped_point
 	end
 	
 	def find_path
 		been_there = {}
-        queue = PriorityQueue.new
-        queue << [1, [@state.worker_location, [], 1]]
-        while !queue.empty?
-          spot, path_so_far, cost_so_far = queue.next
-          next if been_there[spot]
-          newpath = [path_so_far, spot]
-          if (spot == @goal)
-            @path = []
-            newpath.flatten.each_slice(2) {|i,j| @path << [i,j]}
-            return @path
-          end
-          been_there[spot] = true
-          spots_from(spot).each {|newspot|
-            next if been_there[newspot]
-            newcost = cost_so_far + 1
-            queue << [newcost + distance(newspot, @goal), [newspot, newpath, newcost]]
-          }
-        end
-        return nil
+    queue = PriorityQueue.new
+    queue.push(1, [@state.worker_location, [], 1])
+    while !queue.empty?
+      spot, path_so_far, cost_so_far = queue.pop
+      next if been_there[spot]
+      newpath = path_so_far << spot
+      if spot == @goal
+        @path = newpath
+        return @path
+      end
+      been_there[spot] = true
+      spots_from(spot).each {|newspot|
+        next if been_there[newspot]
+        newcost = cost_so_far + 1
+        queue.push(newcost + distance(newspot, @goal), [newspot, newpath, newcost])
+      }
+    end
+    return nil
 	end
 	
 	def closest_unwrapped_point
-		closest_point, min_distance = nil, 0
+		closest_point, closest_distance = nil, 0
 		@state.unwrapped_points.each do |p|
 			d = distance(@start, p)
-			if closest_point.nil? || d < min_distance
+			if closest_point.nil? || d < closest_distance
 				closest_point = p
-				min_distance = d
+				closest_distance = d
 			end
 		end
-		closest_distance
+		puts "closest_unwrapped_point: #{closest_point.inspect}, at distance #{closest_distance}"
+		closest_point
 	end
 	
 	def distance(p1, p2)
-		(p.x - @start.x).abs - (p.y - @start.y).abs
+		(p2.x - p1.x).abs + (p2.y - p1.y).abs
 	end
 	
 	def spots_from(spot)
@@ -56,7 +57,7 @@ class PathFinder
 			Point.new(spot[0], spot[1] - 1)
 		]
 		nearby.reject do |p|
-			@obstacles.any? {|o| o.contains?(p) } || !stage.range.contains?(p)
+			@obstacles.any? {|o| o.contains?(p) } || !@state.range.contains?(p)
 		end
 	end
 end

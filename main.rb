@@ -1,3 +1,5 @@
+require 'pry'
+require './path_finder'
 
 Point = Struct.new(:x, :y)
 MapState = Struct.new(:range, :worker_location, :worker_direction, :manipulator_points, :unwrapped_points, :boosters_held, :boosters_active, :moves, :maps)
@@ -121,15 +123,17 @@ def process(filename)
 	# If none of the above would work, then use the PathFinder to map a route to the nearest unmapped point.
 		# Execute each move in turn, but after each move, re-execute the turn test to see if we can hit any nearby squares.
 	
-#	until state.unwrapped_points.empty? do
-		do_nearby_check(state)
-		path = PathFinder.new(state).find_path
-		puts "path: #{path.inspect}"
-#		path.each do |step|
-#			move_to(state, step)
-#			do_nearby_check(state)
-#		end
- #   end
+    until state.unwrapped_points.empty? do
+        do_nearby_check(state)
+        path = PathFinder.new(state, @obstacles).find_path
+        raise "Bad start for path: #{path.inspect}" unless state.worker_location == path[0]
+        puts "path: #{path.inspect}"
+        path.shift
+        path.each do |step|
+        	move_to(state, step)
+        	do_nearby_check(state)
+        end
+    end
 	puts "----------"
 	state.maps.each {|map| puts map + "\n----------" }
 	
@@ -138,7 +142,8 @@ def process(filename)
 end
 
 def do_nearby_check(state)
-	# TODO: This logic is not quite right.
+	# TODO: This logic is not quite right, but maybe it's good enough.
+	puts "Doing nearby check at location #{state.worker_location}"
 	did_turn = true
 	while did_turn do
 		did_turn = turn_cw_if_it_would_wrap(state)
@@ -202,12 +207,19 @@ def turn_cw_if_it_would_wrap(state)
 
 	# Update the state if any of the new points are unwrapped. TODO: factor in visibility
 	if new_points.any? {|p| state.unwrapped_points.include?(p) }
-		state.worker_direction = new_dir
-		state.unwrapped_points = new_points
+	    puts "turn_cw_if_it_would_wrap returning: true"
+        state.moves << 'E'
+        state.worker_direction = new_dir
+		state.manipulator_points = new_points
+        state.manipulator_points.each do |mp|
+            # TODO: check if worker reach is blocked by obstacle
+            state.unwrapped_points.delete(mp)
+        end            
 		state.maps << draw_map(state)
 		dump_state(state)
 		return true
 	else
+	    puts "turn_cw_if_it_would_wrap returning: false"
 		return false
 	end
 end
@@ -234,22 +246,32 @@ def turn_ccw_if_it_would_wrap(state)
 
 	# Update the state if any of the new points are unwrapped. TODO: factor in visibility
 	if new_points.any? {|p| state.unwrapped_points.include?(p) }
+	    puts "turn_ccw_if_it_would_wrap returning: true"
+	    state.moves << 'Q'
 		state.worker_direction = new_dir
-		state.unwrapped_points = new_points
-		state.maps << draw_map(state)
+		state.manipulator_points = new_points
+        state.manipulator_points.each do |mp|
+            # TODO: check if worker reach is blocked by obstacle
+            state.unwrapped_points.delete(mp)
+        end            
+        state.maps << draw_map(state)
 		dump_state(state)
 		return true
 	else
+	    puts "turn_ccw_if_it_would_wrap returning: false"
 		return false
 	end
 end
 
 def move_to(state, step)
-	loc = state.worker_location
-	move(state, 1, 0, 'W') if step.x == loc.x + 1
-	move(state, -1, 0, 'S') if step.x == loc.x - 1
-	move(state, 0, 1, 'D') if step.y == loc.y + 1
-	move(state, 0, -1, 'A') if step.y == loc.y - 1
+    puts "Moving to #{step.inspect}"
+	loc = state.worker_location.dup
+	new_loc = step.dup
+	move(state, 0, 1, 'W') if new_loc.y == loc.y + 1
+	move(state, 0, -1, 'S') if new_loc.y == loc.y - 1
+	move(state, -1, 0, 'A') if new_loc.x == loc.x - 1
+	move(state, 1, 0, 'D') if new_loc.x == loc.x + 1
+	raise "Bad step: #{step.inspect}, current location: #{loc.inspect}" if state.worker_location == loc
 end
 
 def clone(a)
@@ -298,9 +320,9 @@ def draw_map(state)
         0.upto(@range.right_top.x) do |x|
             p = Point.new(x, y)
             if state.worker_location == p
-                map += '+'
+                map += '*'
             elsif state.manipulator_points.include?(p)
-                map += '-'
+                map += '+'
 			elsif @obstacles.any? {|o| o.contains?(p) }
 				map += '#'
             elsif state.unwrapped_points.include?(p)
